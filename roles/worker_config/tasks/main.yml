@@ -1,0 +1,50 @@
+---
+# ===== Role: Worker Config =====
+
+- name: Deploy 'hosts' file
+  template:
+    src: /etc/ansible/templates/hosts.j2
+    dest: /etc/hosts
+    owner: root
+    group: root
+    mode: '0644'
+    backup: yes
+  tags:
+    - worker_config
+    - hosts
+
+- name: Set timezone
+  timezone:
+    name: "{{ timezone }}"
+  tags:
+    - worker_config
+    - timezone
+
+- name: Install OpenStack client and dependencies
+  apt:
+    name:
+      - python3-openstackclient
+    state: present
+    update_cache: yes
+    cache_valid_time: 3600
+  retries: 3
+  delay: 5
+  register: apt_result
+  until: apt_result is succeeded
+  tags:
+    - worker_config
+    - openstack_preconfig
+
+- name: Display worker config completion
+  debug:
+    msg:
+      - ""
+      - "========================================="
+      - "Workers Config Completed"
+      - "========================================="
+      - ""
+  tags:
+    - worker_config
+    - hosts
+    - timezone
+    - openstack_preconfig

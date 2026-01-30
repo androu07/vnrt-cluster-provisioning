@@ -1,0 +1,22 @@
+---
+# ===== SITE.YML - Master Playbook =====
+# Este playbook ejecuta toda la configuración del cluster
+
+- name: "Configure Headnode"
+  import_playbook: playbooks/openstack-headnode.yml
+
+- name: "Configure Workers"
+  import_playbook: playbooks/openstack-workers.yml
+
+- name: Summary
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Display deployment summary
+      debug:
+        msg:
+          - ""
+          - "========================================="
+          - "Cluster configured"
+          - "========================================="
+          - ""

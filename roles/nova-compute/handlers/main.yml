@@ -1,0 +1,5 @@
+---
+- name: restart nova-compute
+  systemd:
+    name: nova-compute
+    state: restarted

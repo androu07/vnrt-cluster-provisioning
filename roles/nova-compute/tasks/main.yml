@@ -1,0 +1,137 @@
+---
+# ===== Role: Nova Compute =====
+
+- name: Install nova-compute package
+  apt:
+    name: nova-compute
+    state: present
+  tags:
+    - nova-compute
+
+- name: Get management IP address
+  set_fact:
+    mgmt_ip: "{{ ansible_facts[mgmt_network_interface]['ipv4']['address'] }}"
+  when: mgmt_network_interface is defined and mgmt_network_interface in ansible_facts
+  tags:
+    - nova-compute
+
+- name: Configure Transport URL of RabbitMQ
+  ini_file:
+    path: /etc/nova/nova.conf
+    section: DEFAULT
+    option: transport_url
+    value: "rabbit://{{ rabbit_user }}:{{ rabbit_pass }}@{{ controller_hostname }}:5672/"
+  notify: restart nova-compute
+  tags:
+    - nova-compute
+
+- name: Configure Auth Strategy
+  ini_file:
+    path: /etc/nova/nova.conf
+    section: api
+    option: auth_strategy
+    value: keystone
+  notify: restart nova-compute
+  tags:
+    - nova-compute
+
+- name: Configure Keystone Auth Token
+  ini_file:
+    path: /etc/nova/nova.conf
+    section: keystone_authtoken
+    option: "{{ item.option }}"
+    value: "{{ item.value }}"
+  loop:
+    - { option: 'www_authenticate_uri', value: "http://{{ controller_hostname }}:5000/" }
+    - { option: 'auth_url', value: "http://{{ controller_hostname }}:5000/" }
+    - { option: 'memcached_servers', value: "{{ controller_hostname }}:11211" }
+    - { option: 'auth_type', value: 'password' }
+    - { option: 'project_domain_name', value: 'Default' }
+    - { option: 'user_domain_name', value: 'Default' }
+    - { option: 'project_name', value: 'service' }
+    - { option: 'username', value: 'nova' }
+    - { option: 'password', value: "{{ nova_pass }}" }
+  notify: restart nova-compute
+  tags:
+    - nova-compute
+
+- name: Configure Management IP
+  ini_file:
+    path: /etc/nova/nova.conf
+    section: DEFAULT
+    option: my_ip
+    value: "{{ mgmt_ip }}"
+  notify: restart nova-compute
+  tags:
+    - nova-compute
+
+- name: Configure VNC settings
+  ini_file:
+    path: /etc/nova/nova.conf
+    section: vnc
+    option: "{{ item.option }}"
+    value: "{{ item.value }}"
+  loop:
+    - { option: 'enabled', value: 'true' }
+    - { option: 'server_listen', value: '0.0.0.0' }
+    - { option: 'server_proxyclient_address', value: '$my_ip' }
+    - { option: 'novncproxy_base_url', value: "{{ vnc_proxy_base_url }}" }
+  notify: restart nova-compute
+  tags:
+    - nova-compute
+
+- name: Configure Glance API
+  ini_file:
+    path: /etc/nova/nova.conf
+    section: glance
+    option: api_servers
+    value: "http://{{ controller_hostname }}:9292"
+  notify: restart nova-compute
+  tags:
+    - nova-compute
+
+- name: Configure Concurrency lock path
+  ini_file:
+    path: /etc/nova/nova.conf
+    section: oslo_concurrency
+    option: lock_path
+    value: /var/lib/nova/tmp
+  notify: restart nova-compute
+  tags:
+    - nova-compute
+
+- name: Configure Placement service
+  ini_file:
+    path: /etc/nova/nova.conf
+    section: placement
+    option: "{{ item.option }}"
+    value: "{{ item.value }}"
+  loop:
+    - { option: 'region_name', value: "{{ openstack_region }}" }
+    - { option: 'project_domain_name', value: 'Default' }
+    - { option: 'project_name', value: 'service' }
+    - { option: 'auth_type', value: 'password' }
+    - { option: 'user_domain_name', value: 'Default' }
+    - { option: 'auth_url', value: "http://{{ controller_hostname }}:5000/v3" }
+    - { option: 'username', value: 'placement' }
+    - { option: 'password', value: "{{ placement_pass }}" }
+  notify: restart nova-compute
+  tags:
+    - nova-compute
+
+- name: Enable and start nova-compute service
+  systemd:
+    name: nova-compute
+    enabled: yes
+    state: started
+  tags:
+    - nova-compute
+
+- name: Display Nova installation status
+  debug:
+    msg:
+      - "========================================="
+      - "Nova Compute Configured"
+      - "========================================="
+  tags:
+    - nova-compute

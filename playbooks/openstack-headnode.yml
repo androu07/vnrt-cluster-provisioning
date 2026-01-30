@@ -1,0 +1,25 @@
+---
+# ===== OpenStack Config Playbook for Headnode =====
+
+- name: Configure OpenStack Headnode
+  hosts: headnode
+  become: yes
+  gather_facts: yes
+  
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+  roles:
+    - worker_config
+    - headnode_config
+
+  post_tasks:
+    - name: Display completion message
+      debug:
+        msg:
+          - "========================================="
+          - "Headnode Setup Completed"
+          - "========================================="

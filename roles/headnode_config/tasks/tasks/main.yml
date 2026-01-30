@@ -1,0 +1,43 @@
+---
+# ===== Role: Headnode Config =====
+
+- name: Deploy 'hosts' file
+  template:
+    src: /etc/ansible/templates/hosts.j2
+    dest: /etc/hosts
+    owner: root
+    group: root
+    mode: '0644'
+    backup: yes
+  tags:
+    - headnode_config
+    - hosts
+
+- name: Set timezone
+  timezone:
+    name: "{{ timezone }}"
+  tags:
+    - headnode_config
+    - timezone
+
+- name: Install OpenStack client and dependencies
+  apt:
+    name:
+      - python3-openstackclient
+    state: present
+    update_cache: yes
+  tags:
+    - headnode_config
+    - openstack_preconfig
+
+- name: Display headnode config completion
+  debug:
+    msg:
+      - "========================================="
+      - "Headnode Config Completed"
+      - "========================================="
+  tags:
+    - headnode_config
+    - hosts
+    - timezone
+    - openstack_preconfig

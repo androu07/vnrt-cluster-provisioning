@@ -1,0 +1,17 @@
+# ===== Variables Globales de Todos los Hosts =====
+
+# ----- Timezone -----
+timezone: America/Lima
+
+# ----- OpenStack Configuration -----
+controller_hostname: controller
+openstack_region: RegionOne
+
+# ----- RabbitMQ -----
+rabbit_user: openstack
+
+# ----- VNC -----
+vnc_proxy_base_url: "http://controller:6080/vnc_auto.html"
+
+# ----- Neutron -----
+neutron_bridge_mappings: "provider:br-vlan"

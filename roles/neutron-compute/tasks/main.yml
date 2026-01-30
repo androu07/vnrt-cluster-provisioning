@@ -1,0 +1,138 @@
+---
+# ===== Role: Neutron Compute =====
+
+- name: Install Neutron OVS agent
+  apt:
+    name:
+      - neutron-openvswitch-agent
+    state: present
+  tags:
+    - neutron-compute
+
+- name: Get management IP address
+  set_fact:
+    mgmt_ip: "{{ ansible_facts[mgmt_network_interface]['ipv4']['address'] }}"
+  when: mgmt_network_interface is defined and mgmt_network_interface in ansible_facts
+  tags:
+    - neutron-compute
+
+- name: Configure neutron.conf - Transport URL
+  ini_file:
+    path: /etc/neutron/neutron.conf
+    section: DEFAULT
+    option: transport_url
+    value: "rabbit://{{ rabbit_user }}:{{ rabbit_pass }}@{{ controller_hostname }}:5672/"
+  notify: restart neutron-openvswitch-agent
+  tags:
+    - neutron-compute
+
+- name: Configure neutron.conf - Auth strategy
+  ini_file:
+    path: /etc/neutron/neutron.conf
+    section: DEFAULT
+    option: auth_strategy
+    value: keystone
+  notify: restart neutron-openvswitch-agent
+  tags:
+    - neutron-compute
+
+- name: Configure neutron.conf - Keystone authtoken
+  ini_file:
+    path: /etc/neutron/neutron.conf
+    section: keystone_authtoken
+    option: "{{ item.option }}"
+    value: "{{ item.value }}"
+  loop:
+    - { option: 'www_authenticate_uri', value: "http://{{ controller_hostname }}:5000" }
+    - { option: 'auth_url', value: "http://{{ controller_hostname }}:5000" }
+    - { option: 'memcached_servers', value: "{{ controller_hostname }}:11211" }
+    - { option: 'auth_type', value: 'password' }
+    - { option: 'project_domain_name', value: 'Default' }
+    - { option: 'user_domain_name', value: 'Default' }
+    - { option: 'project_name', value: 'service' }
+    - { option: 'username', value: 'neutron' }
+    - { option: 'password', value: "{{ neutron_pass }}" }
+  notify: restart neutron-openvswitch-agent
+  tags:
+    - neutron-compute
+
+- name: Configure OVS agent - OVS settings
+  ini_file:
+    path: /etc/neutron/plugins/ml2/openvswitch_agent.ini
+    section: ovs
+    option: "{{ item.option }}"
+    value: "{{ item.value }}"
+  loop:
+    - { option: 'bridge_mappings', value: "{{ neutron_bridge_mappings }}" }
+    - { option: 'local_ip', value: "{{ mgmt_ip }}" }
+  notify: restart neutron-openvswitch-agent
+  tags:
+    - neutron-compute
+
+- name: Configure OVS agent - Security groups
+  ini_file:
+    path: /etc/neutron/plugins/ml2/openvswitch_agent.ini
+    section: securitygroup
+    option: "{{ item.option }}"
+    value: "{{ item.value }}"
+  loop:
+    - { option: 'enable_security_group', value: 'true' }
+    - { option: 'firewall_driver', value: 'openvswitch' }
+  notify: restart neutron-openvswitch-agent
+  tags:
+    - neutron-compute
+
+- name: Configure OVS agent - Agent settings
+  ini_file:
+    path: /etc/neutron/plugins/ml2/openvswitch_agent.ini
+    section: agent
+    option: "{{ item.option }}"
+    value: "{{ item.value }}"
+  loop:
+    - { option: 'tunnel_types', value: 'vxlan' }
+    - { option: 'l2_population', value: 'true' }
+  notify: restart neutron-openvswitch-agent
+  tags:
+    - neutron-compute
+
+- name: Configure Nova to use Neutron
+  ini_file:
+    path: /etc/nova/nova.conf
+    section: neutron
+    option: "{{ item.option }}"
+    value: "{{ item.value }}"
+  loop:
+    - { option: 'auth_url', value: "http://{{ controller_hostname }}:5000" }
+    - { option: 'auth_type', value: 'password' }
+    - { option: 'project_domain_name', value: 'Default' }
+    - { option: 'user_domain_name', value: 'Default' }
+    - { option: 'region_name', value: "{{ openstack_region }}" }
+    - { option: 'project_name', value: 'service' }
+    - { option: 'username', value: 'neutron' }
+    - { option: 'password', value: "{{ neutron_pass }}" }
+  notify: restart nova-compute
+  tags:
+    - neutron-compute
+
+- name: Enable and start neutron-openvswitch-agent
+  systemd:
+    name: neutron-openvswitch-agent
+    enabled: yes
+    state: started
+  tags:
+    - neutron-compute
+
+- name: Display Neutron installation status
+  debug:
+    msg:
+      - "========================================="
+      - "Neutron OVS Agent Configured"
+      - "========================================="
+      - "Management IP: {{ mgmt_ip }}"
+      - "Bridge mappings: {{ neutron_bridge_mappings }}"
+      - "Service: neutron-openvswitch-agent running"
+      - ""
+      - "Next steps on CONTROLLER:"
+      - "  openstack network agent list"
+  tags:
+    - neutron-compute

@@ -1,0 +1,4 @@
+# ===== Variables específicas de Workers =====
+
+# Interface de red para detección de IP de gestión
+mgmt_network_interface: ens3
